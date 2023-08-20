@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "usepy-plugin-mysql"
+version = "0.0.1"
+description = ""
+authors = ["miclon <jcnd@163.com>"]
+readme = "README.md"
+packages = [
+    { include = 'usepy_plugin_mysql', from = 'src' }
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+usepy = "^0.2.6"
+mysql-connector-python = "^8.1.0"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
