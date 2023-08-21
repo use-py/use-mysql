@@ -3,8 +3,10 @@ import logging
 import time
 from contextlib import contextmanager
 
+from _mysql_connector import MySQLInterfaceError
+
 from mysql.connector.cursor import MySQLCursor
-from mysql.connector.pooling import MySQLConnectionPool
+from mysql.connector.pooling import MySQLConnectionPool, PooledMySQLConnection
 
 MAX_CONNECTION_ATTEMPTS = float('inf')  # 最大连接重试次数
 MAX_CONNECTION_DELAY = 2 ** 5  # 最大延迟时间
@@ -14,6 +16,8 @@ logger = logging.Logger(__name__)
 DEFAULT_CURSOR_PARAMS = {
     "dictionary": True,  # 返回字典类型
 }
+
+_ = lambda key: f"`{key}`"
 
 
 class MysqlStore:
@@ -35,7 +39,7 @@ class MysqlStore:
             self.parameters.update(kwargs)
         self.cursor_params = cursor_params or DEFAULT_CURSOR_PARAMS
         self._connection = None
-        self._cursor = None
+        self._cursor: MySQLCursor = None
 
     def _create_connection(self):
         attempts = 1
@@ -59,7 +63,7 @@ class MysqlStore:
                     delay = min(delay, MAX_CONNECTION_DELAY)
 
     @property
-    def connection(self):
+    def connection(self) -> PooledMySQLConnection:
         if self._connection is None:
             self._connection = self._create_connection()
         return self._connection
@@ -98,7 +102,65 @@ class MysqlStore:
     def __exit__(self, exc_type, exc_val, exc_tb):
         del self.cursor
 
-    def fetchall(self):
-        self.cursor.execute("SELECT * FROM `pp_task`")
-        rows = self.cursor.fetchall()
-        print(rows)
+    def execute(self, sql, params=None):
+        while True:
+            try:
+                self.cursor.execute(sql, params)
+                self.connection.commit()
+                return self.cursor.lastrowid
+            except MySQLInterfaceError:
+                logger.exception(f"MysqlStore execute error<{sql}>")
+                del self.connection
+            except Exception as e:
+                raise e
+
+
+class Mysql(MysqlStore):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._table = None
+        self._where = []
+
+    def table(self, table_name):
+        self._table = table_name
+        return self
+
+    def where(self, **kwargs):
+        for key, value in kwargs.items():
+            if isinstance(value, dict):
+                for operator, condition in value.items():
+                    self._where.append(f"{_(key)} {operator} {condition}")
+            elif isinstance(value, list):
+                condition = ",".join(str(v) for v in value)
+                self._where.append(f"{_(key)} IN ({condition})")
+            else:
+                self._where.append(f"{_(key)} = '{value}'")
+
+        return self
+
+    def insert(self, **kwargs):
+        keys = ",".join(_(key) for key in kwargs.keys())
+        values = ",".join(f"'{value}'" for value in kwargs.values())
+        sql = f"INSERT INTO {_(self._table)} ({keys}) VALUES ({values})"
+        return self.execute(sql)
+
+    def update(self, **kwargs):
+        if not self._table:
+            raise Exception("Table not specified")
+
+        if not self._where:
+            raise Exception("No conditions specified")
+
+        set_values = ", ".join(f"{_(key)} = '{value}'" for key, value in kwargs.items())
+        where_clause = " AND ".join(self._where)
+        sql = f"UPDATE {_(self._table)} SET {set_values} WHERE {where_clause}"
+        return self.execute(sql)
+
+
+if __name__ == '__main__':
+    ms = Mysql(db="db")
+    # print(ms.table("user").insert(name="test"))
+
+    print(ms.table("user").where().update(name="1231"))
