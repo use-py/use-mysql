@@ -20,7 +20,7 @@ DEFAULT_CURSOR_PARAMS = {
 _ = lambda key: f"`{key}`"
 
 
-class MysqlStore:
+class MySQLStore:
 
     def __init__(self, *, host=None, user=None, password=None, port=None, cursor_params=None, **kwargs):
         """
@@ -64,13 +64,13 @@ class MysqlStore:
 
     @property
     def connection(self) -> PooledMySQLConnection:
-        if self._connection is None:
+        if self._connection is None or not self._connection.is_connected():
             self._connection = self._create_connection()
         return self._connection
 
     @connection.deleter
     def connection(self):
-        del self.cursor
+        self._close_cursor()
         if self._connection:
             try:
                 self._connection.close()
@@ -86,11 +86,14 @@ class MysqlStore:
 
     @cursor.deleter
     def cursor(self):
+        self._close_cursor()
+
+    def _close_cursor(self):
         if self._cursor:
             try:
                 self._cursor.close()
             except Exception as exc:
-                logger.exception(f"MysqlStore cursor close error<{exc}>")
+                logger.exception(f"MySQLStore cursor close error <{exc}>")
             self._cursor = None
 
     def __delete__(self, instance):
@@ -105,9 +108,10 @@ class MysqlStore:
     def execute(self, sql, params=None):
         while True:
             try:
-                self.cursor.execute(sql, params)
-                self.connection.commit()
-                return self.cursor.lastrowid
+                with self.cursor as cursor:
+                    cursor.execute(sql, params)
+                    self.connection.commit()
+                    return cursor.lastrowid
             except MySQLInterfaceError:
                 logger.exception(f"MysqlStore execute error<{sql}>")
                 del self.connection
@@ -115,52 +119,78 @@ class MysqlStore:
                 raise e
 
 
-class Mysql(MysqlStore):
+class ModelMetaClass(type):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __new__(cls, name, bases, attrs):
+        super_new = super().__new__
+        if name == "Model":
+            return super_new(cls, name, bases, attrs)
+        module = attrs.pop('__module__')
+        new_attrs = {'__module__': module}
+        for key, value in attrs.items():
+            new_attrs[key] = value
+        new_class = super_new(cls, name, bases, new_attrs)
+        attr_meta = attrs.pop('Meta', None)
+        meta = attr_meta or getattr(new_class, 'Meta', None)
 
-        self._table = None
-        self._where = []
+        new_class.db_table = meta.db_table if hasattr(meta, 'db_table') else name.lower()
+        new_class.connection = meta.connection if hasattr(meta, 'connection') else None
 
-    def table(self, table_name):
-        self._table = table_name
-        return self
+        return new_class
 
-    def where(self, **kwargs):
+
+class Model(metaclass=ModelMetaClass):
+    _where = []
+
+    @classmethod
+    def where(cls, **kwargs):
         for key, value in kwargs.items():
             if isinstance(value, dict):
                 for operator, condition in value.items():
-                    self._where.append(f"{_(key)} {operator} {condition}")
+                    cls._where.append(f"{_(key)} {operator} {condition}")
             elif isinstance(value, list):
                 condition = ",".join(str(v) for v in value)
-                self._where.append(f"{_(key)} IN ({condition})")
+                cls._where.append(f"{_(key)} IN ({condition})")
             else:
-                self._where.append(f"{_(key)} = '{value}'")
+                cls._where.append(f"{_(key)} = '{value}'")
 
-        return self
+        return cls
 
-    def insert(self, **kwargs):
+    @classmethod
+    def create(cls, **kwargs):
         keys = ",".join(_(key) for key in kwargs.keys())
         values = ",".join(f"'{value}'" for value in kwargs.values())
-        sql = f"INSERT INTO {_(self._table)} ({keys}) VALUES ({values})"
-        return self.execute(sql)
+        sql = f"INSERT INTO {_(cls.db_table)} ({keys}) VALUES ({values})"
+        return cls.connection.execute(sql)
 
-    def update(self, **kwargs):
-        if not self._table:
-            raise Exception("Table not specified")
-
-        if not self._where:
+    @classmethod
+    def update(cls, **kwargs):
+        if not cls._where:
             raise Exception("No conditions specified")
 
         set_values = ", ".join(f"{_(key)} = '{value}'" for key, value in kwargs.items())
-        where_clause = " AND ".join(self._where)
-        sql = f"UPDATE {_(self._table)} SET {set_values} WHERE {where_clause}"
-        return self.execute(sql)
+        where_clause = " AND ".join(cls._where)
+        sql = f"UPDATE {_(cls.db_table)} SET {set_values} WHERE {where_clause}"
+        return cls.connection.execute(sql)
+
+    @classmethod
+    def delete(cls, **kwargs):
+        if not cls._where:
+            raise Exception("No conditions specified")
+
+        where_clause = " AND ".join(cls._where)
+        sql = f"DELETE FROM {_(cls.db_table)} WHERE {where_clause}"
+        return cls.connection.execute(sql)
+
+
+class User(Model):
+    class Meta:
+        connection = MySQLStore(db="db")
 
 
 if __name__ == '__main__':
-    ms = Mysql(db="db")
-    # print(ms.table("user").insert(name="test"))
+    print(User.where(id={">": 0}))
 
-    print(ms.table("user").where().update(name="1231"))
+    # created_id = User.create(name="1231")
+    print(User.where(id=4).update(name="miclon123"))
+    # print(User.where(id=18).delete())
