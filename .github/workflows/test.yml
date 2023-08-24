@@ -15,17 +15,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       mysql:
-        image: mysql:latest
+        image: mysql:8.0.21
         ports:
           - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: test_db
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -49,13 +45,9 @@ jobs:
         run: poetry install --no-interaction --no-root
       - name: Install library
         run: poetry install --no-interaction
-      - name: Start MySQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
       - name: Create tables
         run: |
-          mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), created_at datetime NULL DEFAULT NULL, updated_at date NULL DEFAULT NULL);"
+          mysql --host 127.0.0.1 --port 3306 -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), created_at datetime NULL DEFAULT NULL, updated_at date NULL DEFAULT NULL);"
       - name: Run tests
         run: |
           source .venv/bin/activate
