@@ -51,8 +51,8 @@ jobs:
         run: poetry install --no-interaction
       - name: Start MySQL
         run: |
-          apt-get update
-          apt-get install -y mysql-client
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
       - name: Create tables
         run: |
           mysql --host mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
