@@ -55,7 +55,7 @@ jobs:
           sudo apt-get install -y mysql-client
       - name: Create tables
         run: |
-          mysql --host mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), created_at datetime NULL DEFAULT NULL, updated_at date NULL DEFAULT NULL);"
+          mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), created_at datetime NULL DEFAULT NULL, updated_at date NULL DEFAULT NULL);"
       - name: Run tests
         run: |
           source .venv/bin/activate
