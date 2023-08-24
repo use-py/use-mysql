@@ -21,6 +21,11 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: test_db
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -46,11 +51,11 @@ jobs:
         run: poetry install --no-interaction
       - name: Start MySQL
         run: |
-          docker exec -d mysql mysqld
-          sleep 10
+          apt-get update
+          apt-get install -y mysql-client
       - name: Create tables
         run: |
-          docker exec mysql mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
+          mysql --host mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
       - name: Run tests
         run: |
           source .venv/bin/activate
