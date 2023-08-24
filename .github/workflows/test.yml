@@ -16,6 +16,8 @@ jobs:
     services:
       mysql:
         image: mysql:latest
+        ports:
+          - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: test_db
@@ -46,9 +48,9 @@ jobs:
         run: |
           docker exec -d mysql mysqld
           sleep 10
-          - name: Create tables
-            run: |
-              docker exec mysql mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
+      - name: Create tables
+        run: |
+          docker exec mysql mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
       - name: Run tests
         run: |
           source .venv/bin/activate
