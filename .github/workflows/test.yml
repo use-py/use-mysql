@@ -13,6 +13,12 @@ jobs:
         os: [ "ubuntu-latest" ]
         python-version: [ "3.8", "3.9", "3.10" ]
     runs-on: ${{ matrix.os }}
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -36,6 +42,13 @@ jobs:
         run: poetry install --no-interaction --no-root
       - name: Install library
         run: poetry install --no-interaction
+      - name: Start MySQL
+        run: |
+          docker exec -d mysql mysqld
+          sleep 10
+          - name: Create tables
+            run: |
+              docker exec mysql mysql -uroot -proot test_db -e "CREATE TABLE IF NOT EXISTS user (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), `created_at` datetime NULL DEFAULT NULL, `updated_at` date NULL DEFAULT NULL);"
       - name: Run tests
         run: |
           source .venv/bin/activate

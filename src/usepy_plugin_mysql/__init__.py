@@ -1,7 +1,7 @@
 import logging
 
 import time
-from contextlib import contextmanager
+from datetime import datetime, date
 
 from _mysql_connector import MySQLInterfaceError
 
@@ -140,57 +140,91 @@ class ModelMetaClass(type):
 
 
 class Model(metaclass=ModelMetaClass):
-    _where = []
 
-    @classmethod
-    def where(cls, **kwargs):
+    def __init__(self):
+        self._where_conditions = []
+        self._insert_data = {}
+        self._update_data = {}
+        self._delete_flag = False
+
+    @staticmethod
+    def _format_value(value):
+        if isinstance(value, str):
+            return f"'{value}'"
+        elif isinstance(value, date):
+            return f"'{value.strftime('%Y-%m-%d')}'"
+        elif isinstance(value, datetime):
+            return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
+        return value
+
+    def where(self, **kwargs):
         for key, value in kwargs.items():
             if isinstance(value, dict):
                 for operator, condition in value.items():
-                    cls._where.append(f"{_(key)} {operator} {condition}")
+                    self._where_conditions.append(
+                        f"{_(key)} {operator} {self._format_value(condition)}"
+                    )
             elif isinstance(value, list):
                 condition = ",".join(str(v) for v in value)
-                cls._where.append(f"{_(key)} IN ({condition})")
+                self._where_conditions.append(f"{_(key)} IN ({condition})")
             else:
-                cls._where.append(f"{_(key)} = '{value}'")
+                self._where_conditions.append(f"{_(key)} = {self._format_value(value)}")
 
-        return cls
+        return self
 
-    @classmethod
-    def create(cls, **kwargs):
-        keys = ",".join(_(key) for key in kwargs.keys())
-        values = ",".join(f"'{value}'" for value in kwargs.values())
-        sql = f"INSERT INTO {_(cls.db_table)} ({keys}) VALUES ({values})"
-        return cls.connection.execute(sql)
+    def create(self, **kwargs):
+        self._insert_data = kwargs
+        return self
 
-    @classmethod
-    def update(cls, **kwargs):
-        if not cls._where:
+    def update(self, **kwargs):
+        if not self._where_conditions:
             raise Exception("No conditions specified")
 
-        set_values = ", ".join(f"{_(key)} = '{value}'" for key, value in kwargs.items())
-        where_clause = " AND ".join(cls._where)
-        sql = f"UPDATE {_(cls.db_table)} SET {set_values} WHERE {where_clause}"
-        return cls.connection.execute(sql)
+        self._update_data = kwargs
+        return self
 
-    @classmethod
-    def delete(cls, **kwargs):
-        if not cls._where:
+    def delete(self):
+        if not self._where_conditions:
             raise Exception("No conditions specified")
 
-        where_clause = " AND ".join(cls._where)
-        sql = f"DELETE FROM {_(cls.db_table)} WHERE {where_clause}"
-        return cls.connection.execute(sql)
+        self._delete_flag = True
+        return self
 
+    @property
+    def sql(self):
+        if self._insert_data:
+            keys = ",".join(_(key) for key in self._insert_data.keys())
+            values = ",".join(f"{self._format_value(value)}" for value in self._insert_data.values())
+            sql = f"INSERT INTO {_(self.db_table)} ({keys}) VALUES ({values})"
+            return sql
 
-class User(Model):
-    class Meta:
-        connection = MySQLStore(db="db")
+        if self._where_conditions:
+            where_clause = " AND ".join(self._where_conditions)
+            if self._update_data:
+                set_values = ", ".join(f"{_(key)} = '{value}'" for key, value in self._update_data.items())
+                return f"UPDATE {_(self.db_table)} SET {set_values} WHERE {where_clause}"
+            elif self._delete_flag:
+                return f"DELETE FROM {_(self.db_table)} WHERE {where_clause}"
+            else:
+                return f"SELECT * FROM {_(self.db_table)} WHERE {where_clause}"
+        else:
+            return f"SELECT * FROM {_(self.db_table)}"
 
+    def execute(self):
+        logger.warning(self.sql)
+        return self.connection.execute(self.sql)
 
-if __name__ == '__main__':
-    print(User.where(id={">": 0}))
+    def all(self):
+        with self.connection as cursor:
+            cursor.execute(self.sql)
+            result = cursor.fetchall()
+            return result
 
-    # created_id = User.create(name="1231")
-    print(User.where(id=4).update(name="miclon123"))
-    # print(User.where(id=18).delete())
+    def one(self):
+        with self.connection as cursor:
+            cursor.execute(self.sql)
+            result = cursor.fetchone()
+            return result
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.sql}>"
