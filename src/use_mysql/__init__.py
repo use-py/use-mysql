@@ -1,15 +1,13 @@
 import logging
-
 import time
-from datetime import datetime, date
+from datetime import date, datetime
 
 from _mysql_connector import MySQLInterfaceError
-
 from mysql.connector.cursor import MySQLCursor
 from mysql.connector.pooling import MySQLConnectionPool, PooledMySQLConnection
 
-MAX_CONNECTION_ATTEMPTS = float('inf')  # 最大连接重试次数
-MAX_CONNECTION_DELAY = 2 ** 5  # 最大延迟时间
+MAX_CONNECTION_ATTEMPTS = float("inf")  # 最大连接重试次数
+MAX_CONNECTION_DELAY = 2**5  # 最大延迟时间
 
 logger = logging.Logger(__name__)
 
@@ -21,8 +19,16 @@ _ = lambda key: f"`{key}`"
 
 
 class MySQLStore:
-
-    def __init__(self, *, host=None, user=None, password=None, port=None, cursor_params=None, **kwargs):
+    def __init__(
+        self,
+        *,
+        host=None,
+        user=None,
+        password=None,
+        port=None,
+        cursor_params=None,
+        **kwargs,
+    ):
         """
         :param host: Mysql host
         :param port: Mysql port
@@ -30,10 +36,10 @@ class MySQLStore:
         :param kwargs: Mysql parameters
         """
         self.parameters = {
-            'host': host or 'localhost',
-            'user': user or 'root',
-            'password': password or 'root',
-            'port': port or 3306,
+            "host": host or "localhost",
+            "user": user or "root",
+            "password": password or "root",
+            "port": port or 3306,
         }
         if kwargs:
             self.parameters.update(kwargs)
@@ -46,16 +52,18 @@ class MySQLStore:
         delay = 1
         while attempts <= MAX_CONNECTION_ATTEMPTS:
             try:
-                connector = MySQLConnectionPool(
-                    **self.parameters
-                ).get_connection()
+                connector = MySQLConnectionPool(**self.parameters).get_connection()
                 if not connector.is_connected():
                     raise Exception("MysqlStore connection error, not connected")
                 if attempts > 1:
-                    logger.warning(f"MysqlStore connection succeeded after {attempts} attempts", )
+                    logger.warning(
+                        f"MysqlStore connection succeeded after {attempts} attempts",
+                    )
                 return connector
             except Exception as exc:
-                logger.warning(f"MysqlStore connection error<{exc}>; retrying in {delay} seconds")
+                logger.warning(
+                    f"MysqlStore connection error<{exc}>; retrying in {delay} seconds"
+                )
                 attempts += 1
                 time.sleep(delay)
                 if delay < MAX_CONNECTION_DELAY:
@@ -120,27 +128,27 @@ class MySQLStore:
 
 
 class ModelMetaClass(type):
-
     def __new__(cls, name, bases, attrs):
         super_new = super().__new__
         if name == "Model":
             return super_new(cls, name, bases, attrs)
-        module = attrs.pop('__module__')
-        new_attrs = {'__module__': module}
+        module = attrs.pop("__module__")
+        new_attrs = {"__module__": module}
         for key, value in attrs.items():
             new_attrs[key] = value
         new_class = super_new(cls, name, bases, new_attrs)
-        attr_meta = attrs.pop('Meta', None)
-        meta = attr_meta or getattr(new_class, 'Meta', None)
+        attr_meta = attrs.pop("Meta", None)
+        meta = attr_meta or getattr(new_class, "Meta", None)
 
-        new_class.db_table = meta.db_table if hasattr(meta, 'db_table') else name.lower()
-        new_class.connection = meta.connection if hasattr(meta, 'connection') else None
+        new_class.db_table = (
+            meta.db_table if hasattr(meta, "db_table") else name.lower()
+        )
+        new_class.connection = meta.connection if hasattr(meta, "connection") else None
 
         return new_class
 
 
 class Model(metaclass=ModelMetaClass):
-
     def __init__(self):
         self._where_conditions = []
         self._insert_data = {}
@@ -194,15 +202,21 @@ class Model(metaclass=ModelMetaClass):
     def sql(self):
         if self._insert_data:
             keys = ",".join(_(key) for key in self._insert_data.keys())
-            values = ",".join(f"{self._format_value(value)}" for value in self._insert_data.values())
+            values = ",".join(
+                f"{self._format_value(value)}" for value in self._insert_data.values()
+            )
             sql = f"INSERT INTO {_(self.db_table)} ({keys}) VALUES ({values})"
             return sql
 
         if self._where_conditions:
             where_clause = " AND ".join(self._where_conditions)
             if self._update_data:
-                set_values = ", ".join(f"{_(key)} = '{value}'" for key, value in self._update_data.items())
-                return f"UPDATE {_(self.db_table)} SET {set_values} WHERE {where_clause}"
+                set_values = ", ".join(
+                    f"{_(key)} = '{value}'" for key, value in self._update_data.items()
+                )
+                return (
+                    f"UPDATE {_(self.db_table)} SET {set_values} WHERE {where_clause}"
+                )
             elif self._delete_flag:
                 return f"DELETE FROM {_(self.db_table)} WHERE {where_clause}"
             else:
