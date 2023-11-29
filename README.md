@@ -1,4 +1,4 @@
-### usepy-plugin-mysql
+### use-mysql
 
 <a href="https://pypi.org/project/usepy-plugin-mysql" target="_blank">
     <img src="https://img.shields.io/pypi/v/usepy-plugin-mysql.svg" alt="Package version">
@@ -10,7 +10,7 @@
 
 #### 安装
 
-> pip install usepy-plugin-mysql
+> pip install use-mysql
 
 #### 使用
 
