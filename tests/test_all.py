@@ -51,3 +51,27 @@ def test_create(model):
         ).execute()
         > 0
     )
+    for i in range(10):
+        assert (
+            model.create(
+                name=f"qwe{i}",
+                updated_at=datetime.date(datetime.now()),
+            ).execute()
+            > 0
+        )
+
+
+def test_order_by(model):
+    assert model.order_by("id", desc=True).all() == model.all()
+
+
+def test_count(model):
+    assert model.count() > 0
+
+
+def test_all(model):
+    assert len(model.all()) > 0
+
+
+def test_one(model):
+    assert model.one() is not None

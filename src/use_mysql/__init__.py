@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 from _mysql_connector import MySQLInterfaceError
 from mysql.connector.cursor import MySQLCursor
@@ -116,15 +117,16 @@ class MySQLStore:
     def execute(self, sql, params=None):
         while True:
             try:
-                with self.cursor as cursor:
-                    cursor.execute(sql, params)
-                    self.connection.commit()
-                    return cursor.lastrowid
+                cursor = self.cursor
+                cursor.execute(sql, params)
+                self.connection.commit()
+                return cursor.lastrowid
             except MySQLInterfaceError:
                 logger.exception(f"MysqlStore execute error<{sql}>")
                 del self.connection
             except Exception as e:
-                raise e
+                logger.error(f"Unexpected error during SQL execution: {e}")
+                raise
 
 
 class ModelMetaClass(type):
@@ -150,13 +152,16 @@ class ModelMetaClass(type):
 
 class Model(metaclass=ModelMetaClass):
     def __init__(self):
-        self._where_conditions = []
-        self._insert_data = {}
-        self._update_data = {}
-        self._delete_flag = False
+        self._where_conditions: List[str] = []
+        self._insert_data: Dict[str, Any] = {}
+        self._update_data: Dict[str, Any] = {}
+        self._delete_flag: bool = False
+        self._order_by: Optional[str] = None
+        self._limit: Optional[int] = None
+        self._offset: Optional[int] = None
 
     @staticmethod
-    def _format_value(value):
+    def _format_value(value: Any) -> str:
         if isinstance(value, str):
             return f"'{value}'"
         elif isinstance(value, date):
@@ -165,7 +170,7 @@ class Model(metaclass=ModelMetaClass):
             return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
         return value
 
-    def where(self, **kwargs):
+    def where(self, **kwargs) -> "Model":
         for key, value in kwargs.items():
             if isinstance(value, dict):
                 for operator, condition in value.items():
@@ -180,33 +185,45 @@ class Model(metaclass=ModelMetaClass):
 
         return self
 
-    def create(self, **kwargs):
+    def create(self, **kwargs) -> "Model":
         self._insert_data = kwargs
         return self
 
-    def update(self, **kwargs):
+    def update(self, **kwargs) -> "Model":
         if not self._where_conditions:
             raise Exception("No conditions specified")
 
         self._update_data = kwargs
         return self
 
-    def delete(self):
+    def delete(self) -> "Model":
         if not self._where_conditions:
             raise Exception("No conditions specified")
 
         self._delete_flag = True
         return self
 
+    def order_by(self, column: str, desc: bool = False) -> "Model":
+        self._order_by = f"{_(column)} {'DESC' if desc else 'ASC'}"
+        return self
+
+    def limit(self, limit: int) -> "Model":
+        self._limit = limit
+        return self
+
+    def offset(self, offset: int) -> "Model":
+        self._offset = offset
+        return self
+
     @property
-    def sql(self):
+    def sql(self) -> str:
         if self._insert_data:
             keys = ",".join(_(key) for key in self._insert_data.keys())
             values = ",".join(
                 f"{self._format_value(value)}" for value in self._insert_data.values()
             )
-            sql = f"INSERT INTO {_(self.db_table)} ({keys}) VALUES ({values})"
-            return sql
+            _sql = f"INSERT INTO {_(self.db_table)} ({keys}) VALUES ({values})"
+            return _sql
 
         if self._where_conditions:
             where_clause = " AND ".join(self._where_conditions)
@@ -214,31 +231,55 @@ class Model(metaclass=ModelMetaClass):
                 set_values = ", ".join(
                     f"{_(key)} = '{value}'" for key, value in self._update_data.items()
                 )
-                return (
+                _sql = (
                     f"UPDATE {_(self.db_table)} SET {set_values} WHERE {where_clause}"
                 )
+                if self._order_by:
+                    _sql += f" ORDER BY {self._order_by}"
+                if self._limit:
+                    _sql += f" LIMIT {self._limit}"
+                if self._offset:
+                    _sql += f" OFFSET {self._offset}"
+                return _sql
             elif self._delete_flag:
-                return f"DELETE FROM {_(self.db_table)} WHERE {where_clause}"
+                _sql = f"DELETE FROM {_(self.db_table)} WHERE {where_clause}"
             else:
-                return f"SELECT * FROM {_(self.db_table)} WHERE {where_clause}"
+                _sql = f"SELECT * FROM {_(self.db_table)} WHERE {where_clause}"
         else:
-            return f"SELECT * FROM {_(self.db_table)}"
+            _sql = f"SELECT * FROM {_(self.db_table)}"
+        if self._order_by:
+            _sql += f" ORDER BY {self._order_by}"
+        if self._limit:
+            _sql += f" LIMIT {self._limit}"
+        if self._offset:
+            _sql += f" OFFSET {self._offset}"
+        return _sql
 
-    def execute(self):
+    def execute(self) -> int:
         logger.warning(self.sql)
         return self.connection.execute(self.sql)
 
-    def all(self):
+    def all(self) -> List[Dict[str, Any]]:
         with self.connection as cursor:
             cursor.execute(self.sql)
             result = cursor.fetchall()
             return result
 
-    def one(self):
+    def one(self) -> Optional[Dict[str, Any]]:
         with self.connection as cursor:
             cursor.execute(self.sql)
             result = cursor.fetchone()
             return result
+
+    def count(self) -> int:
+        count_sql = f"SELECT COUNT(*) as count FROM {_(self.db_table)}"
+        if self._where_conditions:
+            count_sql += " WHERE " + " AND ".join(self._where_conditions)
+
+        with self.connection as cursor:
+            cursor.execute(count_sql)
+            result = cursor.fetchone()
+            return result["count"] if result else 0
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.sql}>"

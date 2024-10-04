@@ -1,16 +1,13 @@
 [tool.poetry]
 name = "use-mysql"
-version = "0.0.1"
+version = "0.0.2"
 description = ""
 authors = ["miclon <jcnd@163.com>"]
 readme = "README.md"
-packages = [
-    { include = 'use_mysql', from = 'src' }
-]
+packages = [{ include = 'use_mysql', from = 'src' }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-usepy = "^0.2.6"
 mysql-connector-python = "^8.1.0"
 
 
