@@ -71,7 +71,7 @@ class MysqlStore:
             s.refresh(instance)
             return instance
 
-    def delete(self, instance: T) -> None:
+    def delete(self, instance: SQLModel) -> None:
         with self.session() as s:
             s.delete(instance)
             s.commit()
