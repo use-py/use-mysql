@@ -1,21 +1,22 @@
-install: ## Run `poetry install`
-	poetry install --no-root
+install: ## 使用 uv 安装项目依赖
+	uv sync
 
 lint:
-	poetry run isort --check .
-	poetry run black --check .
-	poetry run flake8 src tests
+	uv run isort --check .
+	uv run black --check .
+	uv run flake8 src tests
 
-format: ## Formasts you code with Black
-	poetry run isort .
-	poetry run black .
+format: ## 使用 Black 格式化代码
+	uv run isort .
+	uv run black .
 
-run: ## run `poetry run {{ cookiecutter.package_name }}`
-	poetry run {{ cookiecutter.package_name }}
+run: ## 使用 uv 运行程序（如定义 entrypoints）
+	uv run {{ cookiecutter.package_name }}
 
 
 test:
-	poetry run pytest -v tests
+	uv run pytest -v tests
 
 publish:
-	poetry publish --build
+	uv build
+	uv publish
