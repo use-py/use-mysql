@@ -6,11 +6,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "miclon", email = "jcnd@163.com" }]
 dependencies = [
-    "anyio>=3.6",
-    "pydantic>=2.12.5",
     "pymysql>=1.1.2",
     "sqlmodel>=0.0.29",
-    "tortoise-orm[asyncmy]>=0.25.2",
 ]
 
 [dependency-groups]
