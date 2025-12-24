@@ -1,6 +1,6 @@
 [project]
 name = "use-mysql"
-version = "0.0.3"
+version = "0.0.4"
 description = "A simple MySQL client for Python"
 readme = "README.md"
 requires-python = ">=3.8"
