@@ -1,6 +1,6 @@
 from typing import Any, List, Optional, Type, TypeVar
 
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, create_engine, select, Field
 
 T = TypeVar("T", bound=SQLModel)
 
@@ -92,4 +92,5 @@ class MysqlStore:
 
 useMysql = MysqlStore
 Model = SQLModel
-__all__ = ["MysqlStore", "useMysql", "Model"]
+
+__all__ = ["MysqlStore", "useMysql", "Model", "Field"]

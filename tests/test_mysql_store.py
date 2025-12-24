@@ -4,9 +4,7 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
-from sqlmodel import Field
-
-from use_mysql import Model, MysqlStore
+from use_mysql import Model, MysqlStore, Field
 
 
 class TimestampMixin(Model):
@@ -14,7 +12,7 @@ class TimestampMixin(Model):
 
 
 class User(TimestampMixin, Model, table=True):
-    __tablename__ = "test_users"
+    __tablename__ = "test_users"  # pyright: ignore[reportAssignmentType]
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     mobile: str
@@ -24,7 +22,7 @@ class User(TimestampMixin, Model, table=True):
 def mysql_uri() -> str:
     return os.getenv(
         "MYSQL_URI",
-        "mysql+pymysql://root:root@localhost:3306/use_mysql",
+        "mysql+pymysql://root:root@localhost:3306/onestep",
     )
 
 
