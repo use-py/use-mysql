@@ -3,7 +3,7 @@ name = "use-mysql"
 version = "0.0.3"
 description = "A simple MySQL client for Python"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 authors = [{ name = "miclon", email = "jcnd@163.com" }]
 dependencies = [
     "pymysql>=1.1.2",
