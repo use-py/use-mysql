@@ -1,20 +1,21 @@
+import os
 from datetime import datetime
+from typing import Optional
 from uuid import uuid4
 
-import os
 import pytest
-
 from sqlmodel import Field
-from use_mysql import MysqlStore, Model
+
+from use_mysql import Model, MysqlStore
 
 
 class TimestampMixin(Model):
-    created_at: datetime | None = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
 
 class User(TimestampMixin, Model, table=True):
     __tablename__ = "test_users"
-    id: int | None = Field(default=None, primary_key=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     mobile: str
 

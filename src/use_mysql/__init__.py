@@ -1,9 +1,9 @@
 from typing import Any, List, Optional, Type, TypeVar
 
-from sqlmodel import SQLModel, Session, select
-from sqlmodel import create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 T = TypeVar("T", bound=SQLModel)
+
 
 class MysqlStore:
     def __init__(
@@ -21,9 +21,12 @@ class MysqlStore:
         self._generate_schemas = generate_schemas
         self._kwargs = kwargs
 
-
     def init(self) -> None:
-        self._engine = create_engine(self._db_url, echo=self._echo, **self._kwargs)
+        self._engine = create_engine(
+            self._db_url,
+            echo=self._echo,
+            **self._kwargs,
+        )
         if self._generate_schemas:
             SQLModel.metadata.create_all(self._engine)
         self._initialized = True
