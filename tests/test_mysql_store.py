@@ -4,7 +4,8 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
-from use_mysql import Model, MysqlStore, Field
+
+from use_mysql import Field, Model, MysqlStore
 
 
 class TimestampMixin(Model):
@@ -69,3 +70,18 @@ def test_delete_user(store: MysqlStore):
     u = store.create(User, name="Eve", mobile=f"{uuid4()}")
     store.delete(u)
     assert store.get(User, id=u.id) is None
+
+
+def test_create_many_users(store: MysqlStore):
+    tag = f"{uuid4()}"
+    rows = [
+        {"name": "Frank", "mobile": tag},
+        {"name": "Grace", "mobile": tag},
+    ]
+    created = store.create_many(User, rows)
+    assert len(created) == 2
+    ids = [r.id for r in created]
+    assert all(i is not None for i in ids)
+    fetched = store.filter(User, mobile=tag)
+    names = {r.name for r in fetched}
+    assert {"Frank", "Grace"}.issubset(names)

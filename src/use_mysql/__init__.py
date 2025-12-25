@@ -1,6 +1,6 @@
-from typing import Any, List, Optional, Type, TypeVar
+from typing import Any, Dict, Iterable, List, Optional, Type, TypeVar
 
-from sqlmodel import Session, SQLModel, create_engine, select, Field
+from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 T = TypeVar("T", bound=SQLModel)
 
@@ -48,6 +48,25 @@ class MysqlStore:
             s.commit()
             s.refresh(obj)
             return obj
+
+    def create_many(
+        self,
+        model: Type[T],
+        items: Iterable[Dict[str, Any]],
+    ) -> List[T]:
+        with self.session() as s:
+            objs: List[T] = []
+            for item in items:
+                if isinstance(item, model):
+                    obj = item
+                else:
+                    obj = model(**item)
+                objs.append(obj)
+            s.add_all(objs)
+            s.commit()
+            for obj in objs:
+                s.refresh(obj)
+            return objs
 
     def get(self, model: Type[T], **kwargs: Any) -> Optional[T]:
         with self.session() as s:
