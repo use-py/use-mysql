@@ -136,4 +136,4 @@ poetry.lock
 
 # docs/node_modules
 docs/node_modules
-.uv.lock
+uv.lock
